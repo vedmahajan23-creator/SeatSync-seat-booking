@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: seatsync-app-config
+  labels:
+    app.kubernetes.io/part-of: seatsync
+data:
+  MONGO_URI: mongodb://mongodb:27017
+  MONGO_DATABASE: seatsync
+  VENUES: A=http://venue-a:5001,B=http://venue-b:5002

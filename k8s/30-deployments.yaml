@@ -1,0 +1,238 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: seatsync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/part-of: seatsync
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - name: frontend-content
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+      volumes:
+        - name: frontend-content
+          configMap:
+            name: seatsync-frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: venue-a
+  labels:
+    app.kubernetes.io/name: venue-a
+    app.kubernetes.io/part-of: seatsync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: venue-a
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: venue-a
+        app.kubernetes.io/part-of: seatsync
+    spec:
+      containers:
+        - name: venue
+          image: seatsync-venue:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5001
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: seatsync-app-config
+          env:
+            - name: VENUE_ID
+              value: A
+            - name: VENUE_NAME
+              value: "Jai Ganesh, Akurdi"
+            - name: PORT
+              value: "5001"
+            - name: CLOCK_SKEW_SECONDS
+              value: "-3"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: venue-b
+  labels:
+    app.kubernetes.io/name: venue-b
+    app.kubernetes.io/part-of: seatsync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: venue-b
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: venue-b
+        app.kubernetes.io/part-of: seatsync
+    spec:
+      containers:
+        - name: venue
+          image: seatsync-venue:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5002
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: seatsync-app-config
+          env:
+            - name: VENUE_ID
+              value: B
+            - name: VENUE_NAME
+              value: "Elpro, Pune"
+            - name: PORT
+              value: "5002"
+            - name: CLOCK_SKEW_SECONDS
+              value: "7"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coordinator-1
+  labels:
+    app.kubernetes.io/name: coordinator-1
+    app.kubernetes.io/part-of: seatsync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: coordinator-1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: coordinator-1
+        app.kubernetes.io/part-of: seatsync
+    spec:
+      containers:
+        - name: coordinator
+          image: seatsync-coordinator:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+            - name: peer
+              containerPort: 6000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: seatsync-app-config
+          env:
+            - name: NODE_ID
+              value: "1"
+            - name: HTTP_PORT
+              value: "5000"
+            - name: ELECTION_PORT
+              value: "6000"
+            - name: PEERS_TCP
+              value: 2=coordinator-2:6000
+            - name: PEERS_HTTP
+              value: 2=http://coordinator-2:5010
+            - name: CLOCK_SKEW_SECONDS
+              value: "0"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coordinator-2
+  labels:
+    app.kubernetes.io/name: coordinator-2
+    app.kubernetes.io/part-of: seatsync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: coordinator-2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: coordinator-2
+        app.kubernetes.io/part-of: seatsync
+    spec:
+      containers:
+        - name: coordinator
+          image: seatsync-coordinator:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 5010
+              protocol: TCP
+            - name: peer
+              containerPort: 6000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: seatsync-app-config
+          env:
+            - name: NODE_ID
+              value: "2"
+            - name: HTTP_PORT
+              value: "5010"
+            - name: ELECTION_PORT
+              value: "6000"
+            - name: PEERS_TCP
+              value: 1=coordinator-1:6000
+            - name: PEERS_HTTP
+              value: 1=http://coordinator-1:5000
+            - name: CLOCK_SKEW_SECONDS
+              value: "2"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/part-of: seatsync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mongodb
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mongodb
+        app.kubernetes.io/part-of: seatsync
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:7
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: mongodb
+              containerPort: 27017
+              protocol: TCP
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+      volumes:
+        - name: mongodb-data
+          persistentVolumeClaim:
+            claimName: mongodb-data

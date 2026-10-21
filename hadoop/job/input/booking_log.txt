@@ -1,0 +1,24 @@
+Coordinator 2 ELECTION Node 2 starts an election, asking higher nodes none
+Coordinator 2 ELECTION No higher node answered. Node 2 is now the leader
+Coordinator 2 REQUEST Book A1 for guest1 sent to Venue A
+Jai Ganesh, Akurdi BOOKED guest1 booked A1
+Coordinator 2 REQUEST Book A2 for guest1 sent to Venue A
+Jai Ganesh, Akurdi BOOKED guest1 booked A2
+Coordinator 2 REQUEST Book B1 for guest1 sent to Venue A
+Jai Ganesh, Akurdi BOOKED guest1 booked B1
+Coordinator 2 REQUEST Book C3 for guest1 sent to Venue A
+Jai Ganesh, Akurdi BOOKED guest1 booked C3
+Coordinator 2 REQUEST Book C4 for guest1 sent to Venue A
+Jai Ganesh, Akurdi BOOKED guest1 booked C4
+Coordinator 2 REQUEST Book A1 for guest2 sent to Venue B
+Elpro, Pune BOOKED guest2 booked A1
+Coordinator 2 REQUEST Book D2 for guest2 sent to Venue B
+Elpro, Pune BOOKED guest2 booked D2
+Coordinator 2 REQUEST Book D3 for guest2 sent to Venue B
+Elpro, Pune BOOKED guest2 booked D3
+Elpro, Pune CLOCK_ADJUSTED clock moved by -5.500s
+Coordinator 2 REQUEST Book A1 for guest3 sent to Venue A
+Jai Ganesh, Akurdi BOOK_REJECTED guest3 wanted A1, already taken by guest1
+Jai Ganesh, Akurdi CLOCK_ADJUSTED clock moved by +4.500s
+Coordinator 2 CLOCK_SYNC Berkeley round started, offsets vs leader: Coordinator 2 (leader)=+0.000s, Venue A=-5.000s, Venue B=+5.000s, Coordinator 1=-2.000s
+Coordinator 2 CLOCK_SYNC Berkeley round done, clock spread 10.000s -> 0.000s

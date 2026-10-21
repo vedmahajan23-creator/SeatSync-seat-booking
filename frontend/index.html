@@ -1,0 +1,1159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SeatSync — Distributed Booking</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #090b12;
+    --panel: #111522;
+    --panel-2: #171d2c;
+    --line: #293248;
+    --text: #f5f6fc;
+    --muted: #929bb0;
+    --glow-a: #ff5b6e;
+    --glow-b: #9c5cff;
+    --gold: #eaff73;
+    --booked: #242a39;
+    --success: #59e2b0;
+  }
+  html[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f4f5fa;
+    --panel: #ffffff;
+    --panel-2: #f0f1f8;
+    --line: #dfe2ed;
+    --text: #171a27;
+    --muted: #70788c;
+    --glow-a: #e84361;
+    --glow-b: #7545d7;
+    --gold: #718c00;
+    --booked: #d8dbe5;
+    --success: #118c68;
+  }
+  html, body { transition: background 0.25s ease, color 0.25s ease; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .display { font-family: "Space Grotesk", sans-serif; }
+
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 140px; }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .brand { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.01em; }
+  .brand span { color: var(--glow-a); }
+  .theme-toggle {
+    width: 38px; height: 38px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+  .theme-toggle:hover { transform: scale(1.06); }
+  .theme-toggle:active { transform: scale(0.94); }
+
+  /* ---------- CLUSTER PANEL (the new bully election display) ---------- */
+  .cluster-panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 22px;
+  }
+  .cluster-title {
+    font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;
+  }
+  .cluster-sub { font-size: 0.72rem; color: var(--muted); margin-bottom: 12px; }
+  .node-row { display: flex; gap: 10px; }
+  .node-card {
+    flex: 1;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--panel-2);
+    border: 1.5px solid var(--line);
+    position: relative;
+    transition: all 0.3s ease;
+  }
+  .node-card.leader {
+    border-color: var(--gold);
+    background: linear-gradient(135deg, rgba(242,193,78,0.14), rgba(242,193,78,0.04));
+  }
+  .node-card.dead {
+    opacity: 0.4;
+  }
+  .node-name { font-size: 0.82rem; font-weight: 600; }
+  .node-meta { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+  .crown { position: absolute; top: -8px; right: 10px; font-size: 1rem; }
+  .node-dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 5px; background: var(--muted);
+  }
+  .node-dot.up { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .node-dot.down { background: var(--glow-a); }
+
+  .venue-badges { display: flex; gap: 8px; font-size: 0.72rem; margin-bottom: 22px; }
+  .badge {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .dot.up { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .dot.down { background: var(--glow-a); }
+
+  .venue-select {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 26px;
+  }
+  .venue-card {
+    flex: 1;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: var(--panel);
+    border: 1.5px solid var(--line);
+    cursor: pointer;
+    text-align: left;
+  }
+  .venue-card.active {
+    border-color: var(--glow-a);
+    background: linear-gradient(135deg, rgba(255,77,109,0.12), rgba(123,47,247,0.12));
+  }
+  .venue-card .name { font-weight: 600; font-size: 0.95rem; }
+  .venue-card .meta { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+
+  .screen-area { text-align: center; margin: 34px 0 30px; }
+  .screen-arc {
+    width: 82%;
+    max-width: 480px;
+    height: 10px;
+    margin: 0 auto 10px;
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    background: linear-gradient(90deg, var(--glow-a), var(--glow-b));
+    box-shadow: 0 8px 40px 4px rgba(123,47,247,0.45), 0 4px 22px 2px rgba(255,77,109,0.35);
+  }
+  .screen-label { font-size: 0.68rem; letter-spacing: 0.16em; color: var(--muted); }
+
+  .seat-map { display: flex; flex-direction: column; align-items: center; gap: 9px; margin-bottom: 8px; }
+  .seat-row { display: flex; align-items: center; gap: 8px; }
+  .row-label { width: 16px; font-size: 0.72rem; color: var(--muted); text-align: right; }
+  .seat {
+    width: 30px; height: 30px;
+    border-radius: 8px 8px 10px 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: rgba(0,0,0,0.55);
+    background: var(--success);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .seat.gold { background: var(--gold); }
+  .seat:hover:not(:disabled) { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.35); }
+  .seat.selected {
+    background: transparent;
+    border: 2px solid var(--glow-a);
+    box-shadow: 0 0 0 3px rgba(255,77,109,0.2);
+    color: var(--glow-a);
+    font-weight: 700;
+  }
+  .seat:disabled { background: var(--booked); color: #55566b; cursor: not-allowed; }
+
+  .legend { display: flex; justify-content: center; gap: 18px; margin: 20px 0 4px; font-size: 0.74rem; color: var(--muted); }
+  .legend .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+
+  .feed-panel {
+    margin-top: 20px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px 20px;
+  }
+  .feed-title { font-size: 0.82rem; font-weight: 600; margin-bottom: 3px; }
+  .feed-sub { font-size: 0.72rem; color: var(--muted); margin-bottom: 12px; }
+  .feed-list { max-height: 150px; overflow-y: auto; }
+  .feed-item {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 0.78rem;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--line);
+    color: var(--muted);
+  }
+  .feed-item:last-child { border-bottom: none; }
+  .feed-item .t { color: var(--gold); font-family: monospace; font-size: 0.72rem; }
+  .feed-item b { color: var(--text); }
+  .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px var(--success); flex-shrink: 0; }
+  .pulse-dot.election { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+  .summary-bar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    padding: 14px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(.2,.8,.2,1);
+  }
+  .summary-bar.show { transform: translateY(0); }
+  .summary-left .seats-list { font-size: 0.76rem; color: var(--muted); }
+  .summary-left .price { font-size: 1.05rem; font-weight: 700; color: var(--gold); }
+  .book-btn {
+    background: linear-gradient(135deg, var(--glow-a), var(--glow-b));
+    border: none; color: white; font-weight: 600; font-size: 0.9rem;
+    padding: 12px 24px; border-radius: 12px; cursor: pointer;
+  }
+  .book-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .toast {
+    position: fixed; top: 20px; left: 50%;
+    transform: translateX(-50%) translateY(-12px);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    padding: 12px 20px; border-radius: 12px; font-size: 0.85rem;
+    opacity: 0; transition: all 0.25s ease; pointer-events: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--success); }
+  .toast.error { border-color: var(--glow-a); }
+  .toast.warn { border-color: var(--gold); }
+
+  @media (max-width: 420px) {
+    .seat { width: 24px; height: 24px; }
+    .row-label { width: 12px; }
+  }
+
+  /* ---------- TICKET MODAL ---------- */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 8, 14, 0.72);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    padding: 20px;
+  }
+  .modal-overlay.show { opacity: 1; pointer-events: auto; }
+
+  .ticket {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    transform: translateY(16px) scale(0.98);
+    transition: transform 0.28s cubic-bezier(.2,.8,.2,1);
+  }
+  .modal-overlay.show .ticket { transform: translateY(0) scale(1); }
+
+  .ticket-header {
+    background: linear-gradient(135deg, var(--glow-a), var(--glow-b));
+    padding: 22px 24px 20px;
+    text-align: center;
+    position: relative;
+  }
+  .ticket-check {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.18);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 10px;
+    font-size: 1.3rem;
+  }
+  .ticket-header h3 { margin: 0; font-size: 1.05rem; color: white; }
+  .ticket-header p { margin: 4px 0 0; font-size: 0.78rem; color: rgba(255,255,255,0.85); }
+
+  .ticket-body { padding: 20px 24px; }
+  .ticket-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: 0.85rem;
+  }
+  .ticket-row:last-child { border-bottom: none; }
+  .ticket-row .label { color: var(--muted); }
+  .ticket-row .value { font-weight: 600; text-align: right; }
+  .ticket-row .value.mono { font-family: "Space Grotesk", monospace; letter-spacing: 0.02em; color: var(--gold); }
+
+  .ticket-perforation {
+    position: relative;
+    height: 0;
+    border-top: 2px dashed var(--line);
+    margin: 4px 24px 0;
+  }
+  .ticket-perforation::before, .ticket-perforation::after {
+    content: "";
+    position: absolute;
+    top: -11px;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--bg);
+  }
+  .ticket-perforation::before { left: -34px; }
+  .ticket-perforation::after { right: -34px; }
+
+  .ticket-footer { padding: 16px 24px 22px; }
+  .ticket-close-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 12px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--text);
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+  }
+  .ticket-note {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* ---------- additions for the new backend ---------- */
+  .seat-msg { width: 100%; text-align: center; color: var(--muted); font-size: 0.85rem; padding: 18px 0; }
+  .feed-list { max-height: 230px; }
+  .feed-item { align-items: flex-start; }
+  .feed-item .t { min-width: 40px; }
+  .feed-item .pulse-dot { margin-top: 5px; }
+  .feed-item .d { word-break: break-word; }
+  .feed-item .src { color: var(--text); font-weight: 600; }
+
+  .clock-panel {
+    margin-top: 20px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px 20px;
+  }
+  .clock-summary { font-size: 0.78rem; color: var(--muted); margin-bottom: 10px; }
+  .clock-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; margin-bottom: 14px; }
+  .clock-table th { text-align: left; color: var(--muted); font-weight: 500; padding: 5px 4px; border-bottom: 1px solid var(--line); }
+  .clock-table td { padding: 6px 4px; border-bottom: 1px dashed var(--line); }
+  .clock-table td.num { font-family: "Space Grotesk", monospace; color: var(--gold); }
+  .sync-btn {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 16px; font-size: 0.8rem; font-weight: 600; cursor: pointer;
+  }
+  .sync-btn:hover { border-color: var(--glow-a); }
+  .sync-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .cluster-banner { display: none; margin-bottom: 14px; padding: 10px 14px; border-radius: 12px; font-size: 0.78rem;
+    background: rgba(255,77,109,0.1); border: 1px solid var(--glow-a); color: var(--text); }
+
+  .name-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .name-row label { font-size: 0.78rem; color: var(--muted); }
+  .name-row input {
+    flex: 1; max-width: 240px;
+    background: var(--panel); color: var(--text);
+    border: 1.5px solid var(--line); border-radius: 12px;
+    padding: 10px 14px; font: inherit; font-size: 0.92rem; font-weight: 600;
+    outline: none; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .name-row input:focus { border-color: var(--glow-a); box-shadow: 0 0 0 3px rgba(255,77,109,0.18); }
+  .name-row .hint { font-size: 0.7rem; color: var(--muted); }
+  .seat.mine {
+    background: linear-gradient(135deg, var(--glow-a), var(--glow-b));
+    color: #fff; font-weight: 700; cursor: pointer;
+  }
+
+  /* ===== layout v2: seats first, system status in a side panel ===== */
+  .app { max-width: 1120px; margin: 0 auto; padding: 22px 22px 130px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+  .labs-link { color: var(--text); font-size: 0.8rem; text-decoration: none; padding: 8px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+  .labs-link:hover { border-color: var(--glow-a); }
+  .leader-pill {
+    display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 20px;
+    background: var(--panel-2); border: 1px solid var(--line); font-size: 0.74rem; color: var(--muted);
+  }
+  .leader-pill.ok { border-color: var(--gold); color: var(--text); }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 350px; gap: 22px; align-items: start; }
+  .main-col { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 22px 24px 20px; }
+  .main-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 4px; }
+  .main-col .name-row { margin-bottom: 0; }
+  .main-col .venue-select { margin-bottom: 0; }
+  .main-col .venue-card { background: var(--panel-2); }
+  .main-col .venue-card.active { background: linear-gradient(135deg, rgba(255,77,109,0.14), rgba(123,47,247,0.14)); }
+  .main-col .screen-area { margin: 26px 0 24px; }
+  .main-col .seat-map { gap: 11px; }
+  .main-col .seat-row { gap: 10px; }
+  .main-col .seat { width: 40px; height: 40px; font-size: 0.72rem; border-radius: 10px 10px 12px 12px; }
+  .main-col .row-label { width: 18px; font-size: 0.8rem; }
+  .main-col .legend { flex-wrap: wrap; gap: 8px 16px; margin: 22px 0 6px; }
+  .legend-note { text-align: center; font-size: 0.72rem; color: var(--muted); }
+
+  .side-col { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .side-col .cluster-panel { margin-bottom: 0; padding: 14px 16px; }
+  .side-col .node-row { gap: 8px; }
+  .side-col .node-card { padding: 10px 12px; }
+  .side-col .venue-badges { flex-wrap: wrap; margin: 12px 0 0; }
+  .pane-panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px 14px; }
+  .tabs { display: flex; gap: 6px; background: var(--panel-2); border-radius: 12px; padding: 4px; margin-bottom: 12px; }
+  .tab {
+    flex: 1; border: none; background: transparent; color: var(--muted); font: inherit; font-size: 0.8rem; font-weight: 600;
+    padding: 8px 10px; border-radius: 9px; cursor: pointer;
+  }
+  .tab.active { background: var(--panel); color: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,0.25); }
+  .pane[hidden] { display: none; }
+  .pane .feed-sub { margin-bottom: 10px; }
+  .pane .feed-list { max-height: 330px; }
+  .pane .feed-item { align-items: flex-start; }
+
+  @media (max-width: 920px) {
+    .layout { grid-template-columns: 1fr; }
+    .side-col { position: static; }
+    .app { padding: 16px 14px 130px; }
+    .main-col { padding: 16px 14px; border-radius: 16px; }
+  }
+  @media (max-width: 430px) {
+    .main-col .seat { width: 36px; height: 36px; }
+    .main-col .seat-row { gap: 8px; }
+  }
+
+  /* ===== labels that name the algorithm behind each panel ===== */
+  .chip { display: inline-block; margin-left: 8px; padding: 2px 9px; border-radius: 10px; font-size: 0.64rem; font-weight: 600;
+          letter-spacing: 0.02em; background: rgba(123,47,247,0.16); color: var(--text); border: 1px solid var(--line); vertical-align: 1px; }
+  .explain { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; font-size: 0.78rem; color: var(--muted); }
+  .explain summary { cursor: pointer; font-weight: 600; color: var(--text); font-size: 0.82rem; }
+  .explain dl { margin: 10px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; }
+  .explain dt { color: var(--text); font-weight: 600; white-space: nowrap; }
+  .explain dd { margin: 0; }
+
+  html {
+    background: var(--bg);
+    background-image: radial-gradient(ellipse at 15% 0%, rgba(156,92,255,.12), transparent 38%),
+                      radial-gradient(ellipse at 88% 18%, rgba(255,91,110,.09), transparent 32%);
+    background-attachment: fixed;
+  }
+  body { background: transparent; }
+  .app { max-width: 1360px; padding: 22px 32px 150px; }
+  .topbar { min-height: 56px; margin-bottom: 22px; }
+  .showcase {
+    min-height: 224px; position: relative; overflow: hidden; display: grid; grid-template-columns: 1fr 250px;
+    align-items: center; gap: 20px; padding: 28px 34px 58px; margin-bottom: 20px; border-radius: 26px;
+    border: 1px solid rgba(255,255,255,.1);
+    background: radial-gradient(ellipse at 75% 45%, rgba(156,92,255,.32), transparent 34%),
+                radial-gradient(ellipse at 96% 5%, rgba(255,91,110,.25), transparent 30%),
+                linear-gradient(115deg, #17182b 0%, #19162b 52%, #261a3a 100%);
+    box-shadow: 0 22px 60px rgba(0,0,0,.2);
+  }
+  .showcase-copy { position: relative; z-index: 2; }
+  .showcase-kicker, .section-kicker { color: #b4a9cf; font-size: .65rem; font-weight: 700; letter-spacing: .15em; }
+  .live-orb { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: #65e5b4; box-shadow: 0 0 12px #65e5b4; }
+  .showcase h1 { margin: 14px 0 8px; font: 700 clamp(2.1rem,5vw,3.6rem)/.98 "Space Grotesk", sans-serif; letter-spacing: -.065em; }
+  .showcase h1 span { color: #d1ff68; }
+  .showcase p { max-width: 390px; margin: 0; color: #b7b5c9; font-size: .85rem; }
+  .showcase-art { position: relative; height: 150px; }
+  .art-halo { position: absolute; width: 164px; height: 164px; right: 18px; top: -9px; border-radius: 50%; border: 1px solid rgba(234,255,115,.22); box-shadow: inset 0 0 50px rgba(156,92,255,.1), 0 0 50px rgba(156,92,255,.1); }
+  .art-ticket { position: absolute; z-index: 2; right: 48px; top: 13px; width: 106px; height: 124px; display: flex; align-items: center; flex-direction: column; padding: 13px 8px; border-radius: 13px; color: #1a1724; background: linear-gradient(155deg,#f4ff9c,#a9d746); transform: rotate(8deg); box-shadow: 0 14px 30px rgba(0,0,0,.25); }
+  .art-ticket::before, .art-ticket::after { content: ""; position: absolute; left: -5px; right: -5px; height: 1px; border-top: 1px dashed rgba(25,25,33,.45); }
+  .art-ticket::before { top: 48px; } .art-ticket::after { bottom: 19px; }
+  .art-ticket span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; color: white; background: linear-gradient(135deg,#ff536c,#874fff); font: 700 1rem "Space Grotesk",sans-serif; }
+  .art-ticket b { margin-top: 8px; font: 700 .61rem "Space Grotesk",sans-serif; letter-spacing: .12em; }
+  .art-ticket i { margin-top: auto; font: normal 600 .46rem "Space Grotesk",sans-serif; letter-spacing: .13em; }
+  .art-star { position: absolute; color: #fa6680; text-shadow: 0 0 16px rgba(255,91,110,.6); }
+  .star-one { top: 7px; right: 176px; font-size: 1.6rem; } .star-two { bottom: 8px; right: 17px; color: #eaff73; font-size: 1.4rem; }
+  .art-caption { position: absolute; right: 0; bottom: 1px; color: rgba(255,255,255,.52); font: 600 .55rem/1.25 "Space Grotesk",sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  .showcase-stats { position: absolute; left: 34px; bottom: 16px; display: flex; gap: 20px; color: #a8a3b8; font-size: .55rem; font-weight: 700; letter-spacing: .1em; }
+  .showcase-stats span { display: flex; gap: 5px; align-items: baseline; }
+  .showcase-stats b { color: #eaff73; font: 700 .72rem "Space Grotesk",sans-serif; }
+  .section-heading { display: flex; align-items: center; gap: 12px; }
+  .step-mark { display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px; color: #eaff73; border: 1px solid rgba(234,255,115,.25); border-radius: 11px; background: rgba(234,255,115,.07); font: 700 .7rem "Space Grotesk",sans-serif; }
+  .section-heading h2 { margin: 3px 0 0; font: 700 1.35rem "Space Grotesk",sans-serif; letter-spacing: -.04em; }
+  .brand { display: flex; align-items: center; gap: 11px; font-size: 1.1rem; letter-spacing: -.04em; }
+  .brand::before {
+    content: "S"; display: grid; place-items: center; width: 38px; height: 38px;
+    color: #fff; font: 700 1rem "Space Grotesk", sans-serif; border-radius: 13px;
+    background: linear-gradient(145deg, var(--glow-a), var(--glow-b));
+    box-shadow: 0 8px 24px rgba(156,92,255,.28);
+  }
+  .brand span { color: var(--text); }
+  .labs-link, .leader-pill, .theme-toggle { border-radius: 12px; }
+  .labs-link { padding: 9px 13px; font-weight: 600; transition: .2s ease; }
+  .labs-link:hover { color: var(--text); background: var(--panel); transform: translateY(-1px); }
+  .leader-pill { padding: 9px 13px; color: var(--text); }
+  .leader-pill.ok { border-color: rgba(89,226,176,.4); background: rgba(89,226,176,.08); }
+  .theme-toggle { width: 40px; height: 40px; color: var(--text); }
+  .layout { grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; }
+  .main-col, .cluster-panel, .pane-panel, .explain {
+    background: linear-gradient(145deg, color-mix(in srgb, var(--panel) 94%, white 6%), var(--panel));
+    border: 1px solid var(--line); box-shadow: 0 20px 55px rgba(0,0,0,.18);
+  }
+  .main-col { padding: 28px 32px 26px; border-radius: 24px; position: relative; overflow: hidden; }
+  .main-col::before {
+    content: ""; position: absolute; width: 260px; height: 260px; border-radius: 50%; right: -155px; top: -165px;
+    background: radial-gradient(circle, rgba(156,92,255,.15), transparent 68%); pointer-events: none;
+  }
+  .main-head { position: relative; gap: 18px; margin-bottom: 26px; }
+  .name-row { gap: 14px; }
+  .name-row label { font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; font-weight: 700; }
+  .name-row input { max-width: 280px; background: var(--panel-2); border-radius: 13px; }
+  .venue-select { gap: 12px; }
+  .venue-card { position: relative; overflow: hidden; border-radius: 17px; padding: 18px; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+  .venue-card::after { content: "↗"; position: absolute; right: 17px; top: 15px; color: var(--muted); font-size: 1.1rem; opacity: .7; }
+  .venue-card:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--glow-a) 48%, var(--line)); }
+  .main-col .venue-card.active {
+    border-color: var(--glow-a);
+    background: linear-gradient(120deg, rgba(255,91,110,.14), rgba(156,92,255,.12) 72%, rgba(234,255,115,.07));
+    box-shadow: inset 0 0 0 1px rgba(255,91,110,.12), 0 10px 28px rgba(255,91,110,.08);
+  }
+  .venue-card .name { font-family: "Space Grotesk", sans-serif; font-size: 1rem; letter-spacing: -.02em; }
+  .venue-card .meta { margin-top: 7px; font-size: .7rem; letter-spacing: .02em; }
+  .screen-area { margin: 20px 0 26px !important; }
+  .screen-arc {
+    width: 74%; height: 8px; border-radius: 100% 100% 0 0 / 100% 100% 0 0;
+    background: linear-gradient(90deg, transparent, var(--glow-a) 22%, var(--glow-b) 78%, transparent);
+    box-shadow: 0 8px 34px rgba(156,92,255,.32), 0 3px 22px rgba(255,91,110,.28);
+  }
+  .screen-label { font-size: .62rem; letter-spacing: .34em; font-weight: 700; }
+  .seat-map { gap: 12px !important; padding: 2px 0 8px; }
+  .seat-row { gap: 11px !important; }
+  .row-label { color: var(--muted); font: 600 .7rem "Space Grotesk", sans-serif; }
+  .main-col .seat {
+    width: 42px; height: 42px; border-radius: 13px 13px 11px 11px;
+    background: linear-gradient(145deg, #70f0bf, #32b988); color: #073e30;
+    box-shadow: 0 5px 12px rgba(30,199,143,.11); font: 700 .72rem "Space Grotesk", sans-serif;
+    transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  }
+  .main-col .seat.gold { background: linear-gradient(145deg, #efff94, #bddb3e); color: #394500; }
+  .main-col .seat:hover:not(:disabled) { transform: translateY(-4px) scale(1.05); box-shadow: 0 10px 22px rgba(30,199,143,.22); filter: brightness(1.08); }
+  .main-col .seat.selected { background: linear-gradient(145deg, #ff7385, #a45bff); border: 2px solid #fff; color: #fff; box-shadow: 0 0 0 4px rgba(255,91,110,.16), 0 8px 20px rgba(156,92,255,.24); }
+  .main-col .seat.mine { color: #fff; background: linear-gradient(145deg, #ff7385, #a45bff); }
+  .main-col .seat:disabled { color: #858da0; background: repeating-linear-gradient(135deg, var(--booked), var(--booked) 5px, color-mix(in srgb, var(--booked) 72%, var(--line)) 5px, color-mix(in srgb, var(--booked) 72%, var(--line)) 10px); box-shadow: none; }
+  .main-col .legend { color: var(--muted); font-size: .7rem; }
+  .legend .sw { border-radius: 4px; }
+  .legend-note { margin: 12px auto 0; max-width: 520px; font-size: .7rem; line-height: 1.6; }
+  .side-col { gap: 16px; }
+  .side-col .cluster-panel { padding: 19px; border-radius: 20px; }
+  .cluster-title { font: 700 .9rem "Space Grotesk", sans-serif; }
+  .cluster-sub { margin: 6px 0 16px; line-height: 1.5; }
+  .chip { color: var(--gold); border-color: rgba(234,255,115,.22); background: rgba(234,255,115,.08); border-radius: 99px; }
+  .node-row { gap: 10px; }
+  .side-col .node-card { border-radius: 14px; padding: 12px; }
+  .node-card.leader { border-color: rgba(234,255,115,.55); background: linear-gradient(145deg, rgba(234,255,115,.11), rgba(234,255,115,.025)); box-shadow: 0 0 24px rgba(234,255,115,.06); }
+  .node-card.dead { filter: grayscale(.45); }
+  .node-meta { margin-top: 5px; }
+  .crown { right: 12px; top: -9px; filter: drop-shadow(0 2px 6px rgba(234,255,115,.3)); }
+  .venue-badges { gap: 7px; }
+  .badge { border-radius: 99px; padding: 6px 9px; font-size: .66rem; }
+  .pane-panel { padding: 14px; border-radius: 20px; }
+  .tabs { border-radius: 13px; background: rgba(0,0,0,.14); }
+  .tab { border-radius: 10px; }
+  .tab.active { color: var(--text); background: var(--panel); box-shadow: 0 4px 14px rgba(0,0,0,.16); }
+  .pane .feed-list { max-height: 300px; }
+  .feed-item { gap: 9px; font-size: .72rem; border-color: rgba(146,155,176,.14); }
+  .feed-item .t { color: var(--gold); }
+  .feed-item .src { color: var(--text); }
+  .pulse-dot { box-shadow: 0 0 10px rgba(89,226,176,.4); }
+  .clock-summary { line-height: 1.6; }
+  .sync-btn { border-radius: 11px; transition: .2s ease; }
+  .sync-btn:hover { border-color: var(--glow-a); background: rgba(255,91,110,.08); }
+  .explain { padding: 16px; border-radius: 18px; }
+  .explain summary { font-family: "Space Grotesk", sans-serif; }
+  .explain dl { line-height: 1.55; }
+  .summary-bar {
+    z-index: 40; justify-content: center; gap: 28px; padding: 14px 22px;
+    background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(18px);
+    border: 1px solid var(--line); border-bottom: 0; box-shadow: 0 -18px 55px rgba(0,0,0,.22);
+  }
+  .summary-left { min-width: 180px; }
+  .summary-left .seats-list { font-size: .72rem; }
+  .summary-left .price { font: 700 1.15rem "Space Grotesk", sans-serif; color: var(--gold); }
+  .book-btn { border-radius: 13px; padding: 13px 23px; box-shadow: 0 8px 24px rgba(156,92,255,.23); transition: transform .2s ease, box-shadow .2s ease; }
+  .book-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(156,92,255,.34); }
+  .toast { z-index: 110; border-radius: 14px; box-shadow: 0 12px 38px rgba(0,0,0,.28); }
+  .ticket { border-radius: 24px; box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+  .ticket-header { background: linear-gradient(130deg, #ff536c, #7d4eff 78%, #5bcdcb); }
+  button:focus-visible, a:focus-visible, input:focus-visible, .venue-card:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--glow-b) 75%, white); outline-offset: 3px;
+  }
+  @media (max-width: 920px) {
+    .app { padding: 16px 20px 130px; }
+    .layout { grid-template-columns: 1fr; }
+    .side-col { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+    .side-col .explain { grid-column: 1 / -1; }
+  }
+  @media (max-width: 600px) {
+    .app { padding: 12px 12px 110px; }
+    .topbar { align-items: flex-start; gap: 12px; }
+    .topbar-right { gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+    .labs-link { font-size: .72rem; }
+    .leader-pill { font-size: .66rem; padding: 8px 9px; }
+    .main-col { padding: 20px 14px; }
+    .main-col .venue-card { padding: 14px 12px; }
+    .venue-card .name { font-size: .86rem; }
+    .venue-card .meta { font-size: .63rem; }
+    .main-col .seat { width: 34px; height: 34px; border-radius: 10px; }
+    .main-col .seat-row { gap: 7px !important; }
+    .side-col { display: flex; }
+    .summary-bar { justify-content: space-between; gap: 12px; padding: 12px 14px; }
+    .summary-left { min-width: 0; }
+    .book-btn { padding: 12px 14px; font-size: .8rem; }
+    .showcase { min-height: 205px; grid-template-columns: 1fr 110px; gap: 0; padding: 24px 18px 55px; border-radius: 21px; }
+    .showcase-art { transform: scale(.72); transform-origin: center right; width: 150px; margin-left: -36px; }
+    .showcase h1 { font-size: 2.1rem; }
+    .showcase p { max-width: 250px; font-size: .75rem; }
+    .showcase-kicker { font-size: .52rem; letter-spacing: .1em; }
+    .showcase-stats { left: 18px; gap: 12px; font-size: .48rem; }
+    .showcase-stats b { font-size: .62rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">Seat<span>Sync</span></div>
+    <div class="topbar-right">
+      <a class="labs-link" href="labs.html">Syllabus labs</a>
+      <span class="leader-pill" id="leaderPill"><span class="dot" id="leaderPillDot"></span><span id="leaderPillText">connecting...</span></span>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Switch theme">
+        <span id="themeIcon">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <section class="showcase">
+    <div class="showcase-copy">
+      <span class="showcase-kicker"><span class="live-orb"></span> DISTRIBUTED CINEMA · LIVE BOOKING</span>
+      <h1>Your night.<br><span>Your seats.</span></h1>
+      <p>Pick your cinema, find your perfect spot, and let the system handle the rest.</p>
+    </div>
+    <div class="showcase-art" aria-hidden="true">
+      <div class="art-halo"></div><div class="art-ticket"><span>SS</span><b>TONIGHT</b><i>ADMIT ONE</i></div>
+      <div class="art-star star-one">✳</div><div class="art-star star-two">✦</div>
+      <div class="art-caption">A better<br>seat awaits.</div>
+    </div>
+    <div class="showcase-stats"><span><b>02</b> VENUES</span><span><b>30</b> SEATS / HALL</span><span><b>24/7</b> BOOKING</span></div>
+  </section>
+
+  <div class="layout">
+
+    <main class="main-col">
+      <div class="main-head">
+        <div class="section-heading"><span class="step-mark">01</span><div><span class="section-kicker">MAKE IT A MOVIE NIGHT</span><h2>Choose your seats</h2></div></div>
+        <div class="name-row">
+          <label for="userName">Your name</label>
+          <input id="userName" value="Gullu" maxlength="20" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="venue-select" id="venueSelect">
+          <div class="venue-card active" data-venue="A" onclick="switchVenue('A')">
+            <div class="name">Jai Ganesh &middot; Akurdi</div>
+            <div class="meta" id="metaA">venue server on :5001</div>
+          </div>
+          <div class="venue-card" data-venue="B" onclick="switchVenue('B')">
+            <div class="name">Elpro &middot; Pune</div>
+            <div class="meta" id="metaB">venue server on :5002</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="screen-area">
+        <div class="screen-arc"></div>
+        <div class="screen-label">S C R E E N</div>
+      </div>
+
+      <div class="seat-map" id="seatMap">Loading seats...</div>
+
+      <div class="legend">
+        <span><span class="sw" style="background:var(--success)"></span>Standard &#8377;250</span>
+        <span><span class="sw" style="background:var(--gold)"></span>Premium &#8377;450</span>
+        <span><span class="sw" style="background:var(--booked)"></span>Taken</span>
+        <span><span class="sw" style="background:linear-gradient(135deg,var(--glow-a),var(--glow-b))"></span>Yours</span>
+        <span><span class="sw" style="border:2px solid var(--glow-a); background:transparent"></span>Selected</span>
+      </div>
+      <div class="legend-note">Tap seats to select them. Click a purple seat to cancel your own booking. An atomic MongoDB update ensures only one request can book a seat at a time.</div>
+    </main>
+
+    <aside class="side-col">
+
+      <section class="cluster-panel">
+        <div class="cluster-title">Coordinator cluster<span class="chip">Bully election</span></div>
+        <div class="cluster-sub">Bully election: the highest ID alive always leads. Stop one coordinator to watch failover.</div>
+        <div class="cluster-banner" id="banner">No coordinator is reachable. Start the servers and this page recovers on its own.</div>
+        <div class="node-row" id="nodeRow">
+          <div class="node-card"><div class="node-name">Node 1</div><div class="node-meta">checking...</div></div>
+          <div class="node-card"><div class="node-name">Node 2</div><div class="node-meta">checking...</div></div>
+        </div>
+        <div class="venue-badges" id="serverBadges">
+          <span class="badge"><span class="dot"></span>checking venues...</span>
+        </div>
+      </section>
+
+      <section class="pane-panel">
+        <div class="tabs" role="tablist">
+          <button class="tab active" id="tabActivity" role="tab" onclick="showTab('activity')">Activity <span style="opacity:.6">(Lamport)</span></button>
+          <button class="tab" id="tabClock" role="tab" onclick="showTab('clock')">Clock sync <span style="opacity:.6">(Berkeley)</span></button>
+        </div>
+
+        <div class="pane" id="paneActivity">
+          <div class="feed-sub">Every machine's events in one agreed order, using Lamport timestamps (L).</div>
+          <div class="feed-list" id="feedList">No activity yet.</div>
+        </div>
+
+        <div class="pane" id="paneClock" hidden>
+          <div class="feed-sub">Berkeley algorithm: the leader averages every clock and tells each node how far to move.</div>
+          <div class="clock-summary" id="clockSummary">Waiting for the first sync round.</div>
+          <table class="clock-table" id="clockTable"></table>
+          <button class="sync-btn" id="syncBtn" onclick="syncNow()">Sync clocks now</button>
+        </div>
+      </section>
+
+      <details class="explain" open>
+        <summary>What am I looking at?</summary>
+        <dl>
+          <dt>Cluster</dt><dd>Two coordinators. The one with the highest ID alive is the leader and handles every booking. Stop it and the other takes over (Bully election).</dd>
+          <dt>Seats</dt><dd>Persisted in MongoDB. An atomic conditional update stops concurrent double booking.</dd>
+          <dt>Activity</dt><dd>Events from all machines, ordered by Lamport numbers (L), so cause always comes before effect.</dd>
+          <dt>Clock sync</dt><dd>The venue clocks start wrong on purpose. The leader averages all clocks and corrects each one (Berkeley).</dd>
+        </dl>
+      </details>
+
+    </aside>
+  </div>
+</div>
+
+<div class="summary-bar" id="summaryBar">
+  <div class="summary-left">
+    <div class="seats-list" id="summarySeats">0 seats selected</div>
+    <div class="price" id="summaryPrice">₹0</div>
+  </div>
+  <button class="book-btn" id="bookBtn" onclick="confirmBooking()">Confirm booking</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="ticketOverlay">
+  <div class="ticket">
+    <div class="ticket-header">
+      <div class="ticket-check">✓</div>
+      <h3>Booking confirmed</h3>
+      <p id="ticketVenueLine">Jai Ganesh · Akurdi</p>
+    </div>
+    <div class="ticket-body" id="ticketBody">
+      <!-- filled in dynamically -->
+    </div>
+    <div class="ticket-perforation"></div>
+    <div class="ticket-footer">
+      <button class="ticket-close-btn" onclick="closeTicket()">Done</button>
+      <div class="ticket-note">Booking sent by the leader coordinator to the venue server, stamped with a Lamport clock value</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- THEME TOGGLE ----------
+// Kept in a plain variable (no localStorage) so it works the same from file://.
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  document.getElementById("themeIcon").textContent = theme === "light" ? "🌙" : "☀️";
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  applyTheme(current === "light" ? "dark" : "light");
+}
+applyTheme("dark");
+
+// The two coordinator nodes. The page asks BOTH who the leader is, then sends
+// every real request to the one that says yes. 127.0.0.1 (not "localhost") on
+// purpose: on Windows "localhost" tries IPv6 first and every call gets slow.
+const NODES = [
+  { id: 1, url: "http://127.0.0.1:5000" },
+  { id: 2, url: "http://127.0.0.1:5010" },
+];
+const VENUE_IDS = ["A", "B"];
+const VENUE_NAMES = { A: "Jai Ganesh · Akurdi", B: "Elpro · Pune" };
+const POLL_MS = 3000;
+const SEAT_TIMEOUT_MS = 8000;     // the coordinator may take a moment to reach a venue
+const FAILS_BEFORE_OFFLINE = 3;   // one slow poll must never wipe the seat map
+
+let currentVenue = "A";
+// The name typed in the "Your name" box. It is remembered between visits when the browser allows it.
+const nameBox = document.getElementById("userName");
+try { const saved = localStorage.getItem("seatsync_name"); if (saved) nameBox.value = saved; } catch (e) { /* storage blocked, fine */ }
+function getUser() { return nameBox.value.trim() || "guest"; }
+nameBox.addEventListener("input", () => {
+  try { localStorage.setItem("seatsync_name", nameBox.value.trim()); } catch (e) { /* ignore */ }
+  selectedSeats.clear();
+  renderSeatMap(true);
+  updateSummary();
+});
+const selectedSeats = new Set();
+let leaderUrl = null;
+let leaderId = null;
+let lastSeatSig = "";
+
+// per venue: last good seat map and how many polls in a row have failed
+const venueState = {};
+VENUE_IDS.forEach((v) => (venueState[v] = { seats: null, fails: 0, error: "" }));
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Seat ids look like "C4": row letter + seat number. Rows C and D are premium.
+function rowOf(seatId) { return seatId[0]; }
+function tierOf(seatId) { return "CD".includes(rowOf(seatId)) ? "gold" : "standard"; }
+function priceOf(seatId) { return tierOf(seatId) === "gold" ? 450 : 250; }
+
+// ---------- networking ----------
+async function getJSON(url, options = {}, timeoutMs = 3000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return { status: res.status, data: await res.json() };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---------- cluster (bully election display) ----------
+async function refreshCluster() {
+  const results = await Promise.all(NODES.map(async (node) => {
+    try {
+      let out;
+      try { out = await getJSON(`${node.url}/leader-status`, {}, 2500); }
+      catch (e) { out = await getJSON(`${node.url}/leader-status`, {}, 2500); } // one retry
+      return { ...node, up: true, isLeader: out.data.is_leader, lamport: out.data.lamport };
+    } catch (e) {
+      return { ...node, up: false, isLeader: false };
+    }
+  }));
+
+  // If two nodes briefly both claim leadership, the higher ID wins (bully rule).
+  const claiming = results.filter((r) => r.up && r.isLeader).sort((a, b) => b.id - a.id)[0];
+  const newLeaderId = claiming ? claiming.id : null;
+  if (leaderId !== null && newLeaderId !== null && newLeaderId !== leaderId) {
+    showToast(`Leadership changed. Coordinator ${newLeaderId} took over`, "warn");
+  } else if (leaderId !== null && newLeaderId === null) {
+    showToast("The leader is gone. Waiting for a new election", "warn");
+  }
+  leaderId = newLeaderId;
+  leaderUrl = claiming ? claiming.url : null;
+
+  $("nodeRow").innerHTML = results.map((r) => {
+    if (!r.up) {
+      return `<div class="node-card dead"><div class="node-name"><span class="node-dot down"></span>Node ${r.id}</div>
+              <div class="node-meta">unreachable</div></div>`;
+    }
+    const lead = r.id === leaderId;
+    return `<div class="node-card${lead ? " leader" : ""}">
+      ${lead ? '<span class="crown">👑</span>' : ""}
+      <div class="node-name"><span class="node-dot up"></span>Node ${r.id}</div>
+      <div class="node-meta">${lead ? "LEADER" : "follower"} &middot; Lamport clock ${r.lamport}</div>
+    </div>`;
+  }).join("");
+  $("banner").style.display = results.some((r) => r.up) ? "none" : "block";
+  const pill = $("leaderPill");
+  pill.classList.toggle("ok", leaderId !== null);
+  $("leaderPillDot").className = "dot " + (leaderId !== null ? "up" : "down");
+  $("leaderPillText").textContent = leaderId !== null ? `Node ${leaderId} is leading` : (results.some((r) => r.up) ? "electing a leader..." : "no coordinator reachable");
+}
+
+// ---------- venues and seats ----------
+async function refreshVenues() {
+  if (!leaderUrl) { renderBadges(); renderSeatMap(); return; }
+  await Promise.all(VENUE_IDS.map(async (v) => {
+    const st = venueState[v];
+    try {
+      const { status, data } = await getJSON(`${leaderUrl}/api/seats/${v}`, {}, SEAT_TIMEOUT_MS);
+      if (status === 200 && data.seats) {
+        st.seats = data.seats; st.fails = 0; st.error = "";
+      } else {
+        st.fails++; st.error = data.error || `HTTP ${status}`;
+      }
+    } catch (e) {
+      st.fails++; st.error = e.name === "AbortError" ? "timed out" : String(e.message || e);
+    }
+    if (st.fails > 0) console.warn(`Venue ${v}: seat refresh failed (${st.fails} in a row): ${st.error}`);
+  }));
+  renderBadges();
+  renderSeatMap();
+}
+
+function venueOffline(v) { return venueState[v].fails >= FAILS_BEFORE_OFFLINE; }
+
+function renderBadges() {
+  const el = $("serverBadges");
+  if (!leaderUrl) {
+    el.innerHTML = `<span class="badge"><span class="dot down"></span>no leader elected yet</span>`;
+    return;
+  }
+  el.innerHTML = VENUE_IDS.map((v) => {
+    const st = venueState[v];
+    const known = st.seats !== null || st.fails > 0;
+    const up = known && !venueOffline(v);
+    const label = !known ? "checking" : up ? "online" : "offline";
+    return `<span class="badge" title="${esc(st.error)}"><span class="dot ${up ? "up" : known ? "down" : ""}"></span>${VENUE_NAMES[v]} ${label}</span>`;
+  }).join("");
+  VENUE_IDS.forEach((v) => {
+    const n = venueState[v].seats ? Object.keys(venueState[v].seats).length : null;
+    $("meta" + v).textContent = (n ? `${n} seats · ` : "") + `venue server on :${v === "A" ? 5001 : 5002}`;
+  });
+}
+
+function switchVenue(v) {
+  currentVenue = v;
+  selectedSeats.clear();
+  document.querySelectorAll(".venue-card").forEach((c) => c.classList.toggle("active", c.dataset.venue === v));
+  renderSeatMap(true);
+  updateSummary();
+}
+
+function renderSeatMap(force) {
+  const map = $("seatMap");
+  const st = venueState[currentVenue];
+
+  if (!leaderUrl) {
+    map.innerHTML = `<div class="seat-msg">Waiting for a coordinator to be elected leader...</div>`;
+    lastSeatSig = "";
+    return;
+  }
+  if (!st.seats && st.fails < FAILS_BEFORE_OFFLINE) {
+    if (!map.querySelector(".seat")) map.innerHTML = `<div class="seat-msg">Loading seats...</div>`;
+    return;
+  }
+  if (venueOffline(currentVenue)) {
+    map.innerHTML = `<div class="seat-msg">${VENUE_NAMES[currentVenue]} is not reachable right now.<br>It will come back by itself once the server is up.</div>`;
+    lastSeatSig = "";
+    return;
+  }
+
+  // Only touch the DOM when something changed, so the map never flickers.
+  const sig = currentVenue + getUser() + JSON.stringify(st.seats) + [...selectedSeats].join(",");
+  if (!force && sig === lastSeatSig) return;
+  lastSeatSig = sig;
+
+  const rows = {};
+  Object.entries(st.seats).forEach(([id, owner]) => {
+    (rows[rowOf(id)] = rows[rowOf(id)] || []).push({ id, owner });
+  });
+  map.innerHTML = "";
+  Object.keys(rows).sort().forEach((row) => {
+    const rowDiv = document.createElement("div");
+    rowDiv.className = "seat-row";
+    rowDiv.innerHTML = `<span class="row-label">${row}</span>`;
+    rows[row].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })).forEach((seat) => {
+      const btn = document.createElement("button");
+      const booked = seat.owner !== null;
+      const mine = booked && seat.owner === getUser();
+      btn.className = "seat" + (tierOf(seat.id) === "gold" ? " gold" : "") + (mine ? " mine" : "") +
+                      (selectedSeats.has(seat.id) ? " selected" : "");
+      btn.textContent = seat.id.slice(1);
+      btn.disabled = booked && !mine;
+      btn.title = mine ? `${seat.id} · your seat, click to cancel`
+                       : `${seat.id} · ₹${priceOf(seat.id)}${booked ? " · booked by " + seat.owner : ""}`;
+      btn.onclick = () => (mine ? cancelSeat(seat.id) : toggleSeat(seat.id));
+      rowDiv.appendChild(btn);
+    });
+    map.appendChild(rowDiv);
+  });
+}
+
+async function cancelSeat(seatId) {
+  if (!confirm(`Cancel your booking for seat ${seatId}?`)) return;
+  const res = await postToLeader("/api/cancel", { venue: currentVenue, seat: seatId });
+  showToast(res && res.ok ? `Seat ${seatId} released` : (res && res.error) || "Could not cancel", res && res.ok ? "success" : "error");
+  await refreshAll();
+}
+
+function toggleSeat(seatId) {
+  if (selectedSeats.has(seatId)) selectedSeats.delete(seatId); else selectedSeats.add(seatId);
+  renderSeatMap(true);
+  updateSummary();
+}
+
+function updateSummary() {
+  const bar = $("summaryBar");
+  const total = [...selectedSeats].reduce((sum, id) => sum + priceOf(id), 0);
+  if (selectedSeats.size === 0) { bar.classList.remove("show"); return; }
+  bar.classList.add("show");
+  $("summarySeats").textContent =
+    `${selectedSeats.size} seat${selectedSeats.size > 1 ? "s" : ""} · ${[...selectedSeats].join(", ")}`;
+  $("summaryPrice").textContent = `₹${total}`;
+}
+
+// ---------- booking ----------
+async function postToLeader(path, body, retried) {
+  if (!leaderUrl) return { ok: false, error: "No leader coordinator available right now" };
+  try {
+    const { status, data } = await getJSON(leaderUrl + path, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }, 10000);
+    if (status === 409 && data.error === "This node is not the leader" && !retried) {
+      await refreshCluster();                       // leadership moved, find the new leader and retry once
+      return postToLeader(path, body, true);
+    }
+    return data;
+  } catch (e) {
+    if (!retried) { await refreshCluster(); return postToLeader(path, body, true); }
+    return { ok: false, error: "Could not reach the leader coordinator" };
+  }
+}
+
+async function confirmBooking() {
+  const btn = $("bookBtn");
+  btn.disabled = true;
+  btn.textContent = "Booking...";
+
+  const venue = currentVenue;
+  const receipts = [];
+  const failures = [];
+  for (const seatId of [...selectedSeats]) {
+    const res = await postToLeader("/api/book", { venue, seat: seatId, user: getUser() });
+    if (res && res.ok) {
+      receipts.push({
+        seat_id: seatId, venue,
+        lamport: res.lamport,
+        booking_id: `SS-${venue}${seatId}-L${res.lamport}`,
+        timestamp: new Date().toLocaleString(),
+      });
+    } else {
+      failures.push(res && res.error ? res.error : `${seatId} failed`);
+    }
+  }
+
+  if (receipts.length > 0) showTicket(receipts);
+  if (failures.length > 0) showToast(failures[0] + (failures.length > 1 ? ` (+${failures.length - 1} more)` : ""), "error");
+
+  selectedSeats.clear();
+  btn.disabled = false;
+  btn.textContent = "Confirm booking";
+  updateSummary();
+  await refreshAll();
+}
+
+function showTicket(receipts) {
+  const first = receipts[0];
+  const seatList = receipts.map((r) => r.seat_id).join(", ");
+  const total = receipts.reduce((sum, r) => sum + priceOf(r.seat_id), 0);
+  $("ticketVenueLine").textContent = VENUE_NAMES[first.venue] || `Venue ${first.venue}`;
+  $("ticketBody").innerHTML = `
+    <div class="ticket-row"><span class="label">Booking ID</span><span class="value mono">${esc(first.booking_id)}</span></div>
+    <div class="ticket-row"><span class="label">Seat${receipts.length > 1 ? "s" : ""}</span><span class="value">${esc(seatList)}</span></div>
+    <div class="ticket-row"><span class="label">Booked for</span><span class="value">${esc(getUser())}</span></div>
+    <div class="ticket-row"><span class="label">Date &amp; time</span><span class="value">${esc(first.timestamp)}</span></div>
+    <div class="ticket-row"><span class="label">Lamport stamp</span><span class="value mono">L${first.lamport}</span></div>
+    <div class="ticket-row"><span class="label">Total paid</span><span class="value" style="color:var(--gold)">₹${total}</span></div>
+  `;
+  $("ticketOverlay").classList.add("show");
+}
+
+function showTab(name) {
+  const clock = name === "clock";
+  $("paneClock").hidden = !clock;
+  $("paneActivity").hidden = clock;
+  $("tabClock").classList.toggle("active", clock);
+  $("tabActivity").classList.toggle("active", !clock);
+}
+
+function closeTicket() { $("ticketOverlay").classList.remove("show"); }
+
+// ---------- activity feed (Lamport order) ----------
+async function renderFeed() {
+  const list = $("feedList");
+  if (!leaderUrl) return;
+  try {
+    const { data } = await getJSON(`${leaderUrl}/api/events`, {}, SEAT_TIMEOUT_MS);
+    const events = (data.events || []).slice().reverse().slice(0, 40);
+    if (events.length === 0) { list.innerHTML = `<div style="color:var(--muted); font-size:0.8rem;">No activity yet.</div>`; return; }
+    list.innerHTML = events.map((e) => {
+      const election = e.kind === "ELECTION";
+      return `<div class="feed-item">
+        <span class="pulse-dot ${election ? "election" : ""}"></span>
+        <span class="t">L${e.lamport}</span>
+        <span class="d"><span class="src">${esc(e.source)}</span> · ${esc(e.detail)}</span>
+      </div>`;
+    }).join("");
+  } catch (e) { /* leader may be changing, keep what is on screen */ }
+}
+
+// ---------- clock synchronisation (Berkeley) ----------
+async function renderClock() {
+  if (!leaderUrl) return;
+  try {
+    const { data } = await getJSON(`${leaderUrl}/api/clock-status`, {}, 4000);
+    if (!data.last_sync) { $("clockSummary").textContent = "Waiting for the first sync round."; return; }
+    const s = data.last_sync;
+    const sec = (n) => `${n >= 0 ? "+" : "-"}${Math.abs(n).toFixed(3)} s`;
+    $("clockSummary").textContent =
+      `Round ${data.rounds}: clocks were ${s.spread_before_s.toFixed(3)} s apart, now ${s.spread_after_s.toFixed(3)} s apart.`;
+    $("clockTable").innerHTML = "<tr><th>Node</th><th>Offset before</th><th>Correction</th></tr>" +
+      Object.keys(s.offsets_before).map((k) =>
+        `<tr><td>${esc(k)}</td><td class="num">${sec(s.offsets_before[k])}</td><td class="num">${sec(s.adjustments[k] ?? 0)}</td></tr>`).join("");
+  } catch (e) { /* ignore */ }
+}
+
+async function syncNow() {
+  const btn = $("syncBtn");
+  btn.disabled = true;
+  const res = await postToLeader("/api/sync", {});
+  showToast(res && res.ok ? "Clocks synchronised" : (res && res.error) || "Sync failed", res && res.ok ? "success" : "error");
+  btn.disabled = false;
+  refreshAll();
+}
+
+// ---------- toast ----------
+function showToast(msg, type) {
+  const toast = $("toast");
+  toast.textContent = msg;
+  toast.className = "toast show " + type;
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => toast.classList.remove("show"), 3200);
+}
+
+// ---------- polling: one round at a time, never overlapping ----------
+async function refreshAll() {
+  await refreshCluster();
+  await Promise.all([refreshVenues(), renderFeed(), renderClock()]);
+}
+let polling = false;
+async function pollLoop() {
+  if (!polling) {
+    polling = true;
+    try { await refreshAll(); } catch (e) { console.warn("poll failed", e); }
+    polling = false;
+  }
+  setTimeout(pollLoop, POLL_MS);
+}
+pollLoop();
+</script>
+</body>
+</html>

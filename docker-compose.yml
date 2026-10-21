@@ -1,0 +1,99 @@
+# One command deploys the whole system:  docker compose up -d --build
+# Every service sits on the same private network and finds the others by name.
+services:
+  mongodb:
+    image: mongo:7
+    container_name: seatsync_mongodb
+    ports: ["27017:27017"]
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  venue_a:
+    build: { context: ., dockerfile: venue/Dockerfile }
+    container_name: venue_a
+    environment:
+      VENUE_ID: "A"
+      VENUE_NAME: "Jai Ganesh, Akurdi"
+      PORT: "5001"
+      CLOCK_SKEW_SECONDS: "-3"      # this machine's clock is 3 seconds slow
+      MONGO_URI: "mongodb://mongodb:27017"
+      MONGO_DATABASE: "seatsync"
+    ports: ["5001:5001"]
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5001/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  venue_b:
+    build: { context: ., dockerfile: venue/Dockerfile }
+    container_name: venue_b
+    environment:
+      VENUE_ID: "B"
+      VENUE_NAME: "Elpro, Pune"
+      PORT: "5002"
+      CLOCK_SKEW_SECONDS: "7"       # this machine's clock is 7 seconds fast
+      MONGO_URI: "mongodb://mongodb:27017"
+      MONGO_DATABASE: "seatsync"
+    ports: ["5002:5002"]
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5002/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  coordinator_1:
+    build: { context: ., dockerfile: coordinator/Dockerfile }
+    container_name: coordinator_1
+    depends_on:
+      venue_a:
+        condition: service_healthy
+      venue_b:
+        condition: service_healthy
+    environment:
+      NODE_ID: "1"
+      HTTP_PORT: "5000"
+      ELECTION_PORT: "6000"
+      PEERS_TCP: "2=coordinator_2:6000"
+      PEERS_HTTP: "2=http://coordinator_2:5010"
+      VENUES: "A=http://venue_a:5001,B=http://venue_b:5002"
+      CLOCK_SKEW_SECONDS: "0"
+    ports: ["5000:5000"]
+
+  coordinator_2:
+    build: { context: ., dockerfile: coordinator/Dockerfile }
+    container_name: coordinator_2
+    depends_on:
+      venue_a:
+        condition: service_healthy
+      venue_b:
+        condition: service_healthy
+    environment:
+      NODE_ID: "2"
+      HTTP_PORT: "5010"
+      ELECTION_PORT: "6000"
+      PEERS_TCP: "1=coordinator_1:6000"
+      PEERS_HTTP: "1=http://coordinator_1:5000"
+      VENUES: "A=http://venue_a:5001,B=http://venue_b:5002"
+      CLOCK_SKEW_SECONDS: "2"
+    ports: ["5010:5010"]
+
+  frontend:
+    image: nginx:alpine
+    container_name: frontend
+    volumes: ["./frontend:/usr/share/nginx/html:ro"]
+    ports: ["8080:80"]
+
+volumes:
+  mongodb_data:

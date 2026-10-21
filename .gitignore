@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local Salesforce CLI metadata can contain organization identifiers.
+.sf/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

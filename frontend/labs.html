@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SeatSync — Distributed Systems Labs</title>
+  <style>
+    :root { color-scheme: dark; --bg:#101018; --panel:#1a1b26; --panel2:#20212f; --line:#34364a; --text:#eceaf6; --muted:#a0a0b4; --accent:#ff6680; --gold:#f2c14e; --ok:#3ecf8e; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 Inter,Segoe UI,Arial,sans-serif; }
+    main { max-width:1100px; margin:auto; padding:26px 18px 70px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:24px; }
+    h1,h2,h3 { font-family:"Segoe UI",Arial,sans-serif; line-height:1.2; }
+    h1 { margin:0; font-size:clamp(1.5rem,4vw,2.35rem); }
+    h2 { margin:0 0 12px; font-size:1.25rem; }
+    h3 { margin:0 0 7px; font-size:1rem; }
+    p { margin:6px 0 12px; }
+    a { color:#ff91a4; }
+    .sub { color:var(--muted); max-width:780px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; margin:16px 0; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; }
+    .mini { background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:14px; }
+    .tag { display:inline-block; border:1px solid var(--line); border-radius:99px; padding:2px 9px; color:var(--gold); font-size:.74rem; margin:0 4px 5px 0; }
+    button,select,input { color:var(--text); background:#292a39; border:1px solid #484a60; border-radius:9px; padding:9px 11px; font:inherit; }
+    button { cursor:pointer; }
+    button:hover { border-color:var(--accent); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    input[type=number] { width:90px; }
+    .controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0; }
+    .output { min-height:42px; white-space:pre-wrap; overflow-wrap:anywhere; color:#c9c7d9; background:#12131b; border:1px solid var(--line); border-radius:10px; padding:11px; margin-top:10px; font: .84rem/1.5 Consolas,monospace; }
+    .good { color:var(--ok); } .warn { color:var(--gold); }
+    .table { width:100%; border-collapse:collapse; font-size:.88rem; }
+    .table th,.table td { text-align:left; border-bottom:1px solid var(--line); padding:7px; }
+    .topic-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:10px; }
+    .topic-list details { background:var(--panel2); padding:11px 13px; border-radius:10px; }
+    summary { cursor:pointer; font-weight:650; }
+    .small { color:var(--muted); font-size:.83rem; }
+    .seat-node { border:1px solid var(--line); padding:8px 11px; border-radius:9px; display:inline-block; margin:4px; }
+    footer { color:var(--muted); font-size:.82rem; margin-top:28px; }
+    @media(max-width:540px) { header { align-items:flex-start; flex-direction:column; } .controls>* { max-width:100%; } }
+    :root { color-scheme:dark; --bg:#090b12; --panel:#111522; --panel2:#171d2c; --line:#293248; --text:#f5f6fc; --muted:#929bb0; --accent:#ff687b; --gold:#eaff73; --ok:#59e2b0; }
+    body {
+      background-image:radial-gradient(ellipse at 12% 0%,rgba(156,92,255,.14),transparent 36%),
+                       radial-gradient(ellipse at 92% 10%,rgba(255,91,110,.1),transparent 30%);
+      background-attachment:fixed;
+    }
+    main { max-width:1240px; padding:28px 28px 70px; }
+    header { position:relative; overflow:hidden; padding:34px 36px; min-height:190px; border:1px solid rgba(255,255,255,.1); border-radius:24px;
+      background:radial-gradient(ellipse at 86% 32%,rgba(156,92,255,.3),transparent 33%),
+                 linear-gradient(115deg,#17182b,#211832 74%,#2d1d3d); box-shadow:0 22px 60px rgba(0,0,0,.2); }
+    header::after { content:"DS / LABS"; position:absolute; right:35px; bottom:18px; color:rgba(234,255,115,.55); font:700 .62rem/1.2 Consolas,monospace; letter-spacing:.2em; }
+    header > div { position:relative; z-index:1; }
+    h1 { max-width:760px; margin:0 0 12px; font-size:clamp(2rem,4.3vw,3.25rem); letter-spacing:-.06em; }
+    header .sub { max-width:690px; font-size:.92rem; }
+    header > a { position:relative; z-index:2; flex:0 0 auto; padding:10px 14px; border:1px solid rgba(255,255,255,.16); border-radius:11px; color:#fff; background:rgba(255,255,255,.05); text-decoration:none; }
+    header > a:hover { background:rgba(255,255,255,.12); }
+    .card { padding:22px; margin:18px 0; border-radius:19px; background:linear-gradient(145deg,rgba(20,25,40,.96),rgba(15,19,31,.98)); box-shadow:0 16px 44px rgba(0,0,0,.14); }
+    .card > h2 { font-size:1.28rem; letter-spacing:-.035em; }
+    .grid { gap:14px; }
+    .mini { padding:16px; border-radius:14px; background:linear-gradient(145deg,rgba(28,35,53,.86),rgba(21,27,42,.92)); border-color:rgba(146,155,176,.15); transition:transform .2s ease,border-color .2s ease; }
+    .mini:hover { transform:translateY(-2px); border-color:rgba(156,92,255,.42); }
+    .mini h3 { font-size:1rem; letter-spacing:-.02em; }
+    .mini p { color:#aab2c4; font-size:.86rem; }
+    button,select,input { border-radius:10px; background:#20283a; border-color:#38445d; transition:background .18s ease,border-color .18s ease,transform .18s ease; }
+    button { font-weight:600; }
+    button:hover:not(:disabled) { background:#2b3044; border-color:var(--accent); transform:translateY(-1px); }
+    button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible { outline:3px solid rgba(156,92,255,.75); outline-offset:2px; }
+    .output { border-radius:11px; background:#0b0e17; border-color:rgba(146,155,176,.17); color:#d0d5e2; }
+    .table { border-radius:10px; overflow:hidden; }
+    .table th { color:var(--gold); }
+    .table th,.table td { border-color:rgba(146,155,176,.16); }
+    .topic-list { gap:11px; }
+    .topic-list details { border:1px solid rgba(146,155,176,.13); border-radius:12px; background:rgba(24,30,46,.8); padding:14px; }
+    .topic-list details[open] { border-color:rgba(156,92,255,.32); }
+    .topic-list summary { color:#f0eff9; }
+    .topic-list details p { color:#aab2c4; font-size:.85rem; }
+    .seat-node { border-radius:10px; background:rgba(255,255,255,.025); }
+    .tag { color:var(--gold); }
+    a { color:#ff9aa8; }
+    footer { border-top:1px solid rgba(146,155,176,.16); padding-top:18px; line-height:1.6; }
+    @media(max-width:700px) {
+      main { padding:14px 12px 48px; }
+      header { padding:24px 20px; min-height:0; flex-direction:column; align-items:flex-start; border-radius:20px; }
+      header::after { right:18px; bottom:12px; font-size:.5rem; }
+      header > a { margin-top:5px; }
+      .card { padding:16px; border-radius:16px; }
+    }
+    @media(prefers-reduced-motion:reduce) { *,*::before,*::after { transition-duration:.01ms !important; animation-duration:.01ms !important; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Distributed Systems · Interactive Labs</h1><div class="sub">Experiments and explanations that complement the SeatSync booking application. Simulations are labelled; they are not claims of production implementations.</div></div>
+    <a href="index.html">← SeatSync booking app</a>
+  </header>
+
+  <section class="card">
+    <h2>What the main project demonstrates</h2>
+    <div class="grid">
+      <div class="mini"><h3>Real services</h3><p>Browser UI, two venue services, two coordinators and MongoDB communicate over HTTP and TCP in Docker Compose or Kubernetes.</p></div>
+      <div class="mini"><h3>Implemented algorithms</h3><p>Bully leader election, Lamport logical clocks, Berkeley physical clock synchronization, and atomic per-seat MongoDB updates.</p></div>
+      <div class="mini"><h3>Limits</h3><p>Two coordinators are a demo, not quorum consensus. Venue event history and coordinator clocks are in memory. A single MongoDB instance is persistent but not highly available.</p></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Communication models</h2>
+    <p class="small">RPC/request-response, message-oriented, stream-oriented, peer-to-peer messaging and WebRTC are distinct communication patterns. The buttons below demonstrate their behavior locally in this browser.</p>
+    <div class="grid">
+      <div class="mini"><h3>RPC / request-response</h3><p>Caller waits for a response from a named operation.</p><button onclick="rpcDemo()">Call reserveSeat()</button><div class="output" id="rpcOut">Ready.</div></div>
+      <div class="mini"><h3>Message-oriented queue</h3><p>Producer and consumer are decoupled by a queue; messages can wait until consumed.</p><div class="controls"><button onclick="enqueue()">Publish message</button><button onclick="dequeue()">Consume next</button></div><div class="output" id="queueOut">Queue empty.</div></div>
+      <div class="mini"><h3>Stream-oriented</h3><p>A stream delivers ordered chunks over time rather than one complete message.</p><button onclick="streamDemo()">Emit three chunks</button><div class="output" id="streamOut">No stream started.</div></div>
+      <div class="mini"><h3>P2P and WebRTC DataChannel</h3><p>This creates two local WebRTC peers in the browser, exchanges SDP/ICE locally, then sends a peer-to-peer data-channel message. No external signaling server is used in this loopback demo.</p><div class="controls"><button id="rtcConnect" onclick="connectRTC()">Connect local peers</button><input id="rtcMessage" value="Hello peer" aria-label="WebRTC message"><button id="rtcSend" onclick="sendRTC()" disabled>Send</button></div><div class="output" id="rtcOut">WebRTC is not connected.</div></div>
+    </div>
+    <p class="small">Names, identifiers and addresses: a name is a human-friendly label (for example, venue A); an identifier is a stable unique key (for example, A:C4); an address tells a client how to reach a service (for example, coordinator DNS name and port). DNS/service discovery maps names to current addresses.</p>
+  </section>
+
+  <section class="card">
+    <h2>Synchronization and distributed computation</h2>
+    <div class="grid">
+      <div class="mini">
+        <h3>Lamport and vector clocks</h3>
+        <p>Make local events or send/deliver messages between processes. Lamport order captures causality only as “happened before”; vector clocks can distinguish concurrent events.</p>
+        <div class="controls"><button onclick="localEvent(0)">Local event P1</button><button onclick="sendClockMessage(0,1)">Send P1 → P2</button><button onclick="deliverClockMessage()">Deliver to P2</button><button onclick="localEvent(1)">Local event P2</button></div>
+        <table class="table"><thead><tr><th>Process</th><th>Lamport</th><th>Vector [P1,P2]</th></tr></thead><tbody id="clockRows"></tbody></table>
+        <div class="output" id="clockOut">No events.</div>
+      </div>
+      <div class="mini">
+        <h3>Global state / snapshot</h3>
+        <p>A distributed snapshot records process states plus messages in transit. It is not the same as reading all machines at one wall-clock instant.</p>
+        <button onclick="takeSnapshot()">Record snapshot</button><div class="output" id="snapshotOut">No snapshot recorded.</div>
+      </div>
+      <div class="mini">
+        <h3>Physical clock synchronization</h3>
+        <p>Berkeley-style coordinator averages offsets and asks nodes to adjust. The booking system implements a simplified version; wall clocks are never perfectly synchronized.</p>
+        <div class="controls">Offsets (s): <input id="offset1" type="number" value="-3" step="0.5"><input id="offset2" type="number" value="7" step="0.5"><input id="offset3" type="number" value="2" step="0.5"><button onclick="syncClocks()">Calculate adjustments</button></div>
+        <div class="output" id="syncOut">Enter offsets relative to the coordinator.</div>
+      </div>
+    </div>
+    <p class="small"><b>Model of distributed computations:</b> represent each process as an event sequence; communication edges connect send and receive events. A valid global ordering is a topological ordering that preserves every process order and every message’s send-before-receive relation. Virtualization and containers package processes and their dependencies, improving isolation and repeatability but not removing network or storage failures.</p>
+  </section>
+
+  <section class="card">
+    <h2>Election, mutual exclusion, fault tolerance and deadlocks</h2>
+    <div class="grid">
+      <div class="mini">
+        <h3>Election algorithms</h3><p>The live booking system runs Bully election. Compare with a ring-election token passing through live members.</p>
+        <div class="controls"><label>Start node <select id="electionStart"><option>1</option><option>2</option><option>3</option><option>4</option></select></label><button onclick="runElection('bully')">Run Bully</button><button onclick="runElection('ring')">Run ring</button></div>
+        <div class="controls"><button onclick="toggleNode(1)">Toggle node 1</button><button onclick="toggleNode(2)">Toggle node 2</button><button onclick="toggleNode(3)">Toggle node 3</button><button onclick="toggleNode(4)">Toggle node 4</button></div><div id="nodeStatus"></div><div class="output" id="electionOut">All nodes are alive.</div>
+      </div>
+      <div class="mini">
+        <h3>Mutual exclusion</h3><p>Choose an algorithm, request the critical section from nodes, then release it. The app uses a MongoDB conditional update to serialize a seat, not the simulated message algorithms below.</p>
+        <div class="controls"><select id="mutexAlgo"><option value="central">Central coordinator</option><option value="lamport">Lamport request queue</option><option value="ra">Ricart–Agrawala (permission replies)</option></select></div>
+        <div class="controls"><button onclick="requestCS(1)">P1 requests</button><button onclick="requestCS(2)">P2 requests</button><button onclick="requestCS(3)">P3 requests</button><button onclick="releaseCS()">Release current</button></div>
+        <div class="output" id="mutexOut">Critical section is free.</div>
+        <p class="small">Fairness note: timestamp plus process-ID ordering avoids tie ambiguity in this simplified queue. Lodha–Kshemkalyani fair mutual exclusion is a self-study topic and is not implemented by this queue simulation.</p>
+      </div>
+      <div class="mini">
+        <h3>Deadlock detection</h3><p>Knapp classifies distributed deadlock detection algorithms by the information and detection strategy used. A wait-for graph cycle indicates deadlock under the single-instance resource model.</p>
+        <div class="controls"><select id="deadlockMode"><option value="cycle">A waits for B, B waits for C, C waits for A</option><option value="none">A waits for B, B waits for C</option><option value="edge">A waits for B, B waits for A</option></select><button onclick="detectDeadlock()">Detect cycle</button></div>
+        <div class="output" id="deadlockOut">Select a wait-for graph and run detection.</div>
+      </div>
+      <div class="mini">
+        <h3>Beacon / heartbeat failure detector</h3><p>Missed beacons suggest a process may have failed, but a slow or partitioned network can look like a crash. This simple timeout detector can make mistakes.</p>
+        <div class="controls"><button onclick="beacon(true)">Receive beacon</button><button onclick="beacon(false)">Miss beacon</button><button onclick="resetBeacon()">Reset</button></div><div class="output" id="beaconOut">Node healthy; 0 consecutive misses.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Architectures, design issues and emerging paradigms</h2>
+    <div class="topic-list">
+      <details open><summary>Types, architectures and middleware</summary><p>Centralized client-server, multi-tier, peer-to-peer and hybrid systems differ in control and failure patterns. Middleware offers common APIs for messaging, naming, serialization, discovery and security. Design issues include partial failure, latency, consistency, replication, concurrency, security and observability.</p></details>
+      <details><summary>Distributed multimedia systems</summary><p>Audio/video systems need timely delivery, synchronization of media streams, jitter buffering, adaptive quality and often tolerate some loss rather than waiting for late data. This project has no media pipeline; its WebRTC exercise is a data channel only.</p></details>
+      <details><summary>Fault tolerance</summary><p>Replication, retries, timeouts, health checks and leader election help handle faults. Retries need idempotency; partitions can create split brain. The demo uses leader failover but has no quorum consensus or replicated database.</p></details>
+      <details><summary>Distributed object- and web-based systems</summary><p>Remote objects expose methods through proxies/stubs; REST/HTTP exposes resources and representations. SeatSync uses HTTP JSON endpoints and a browser client; the coordinator-to-venue request is RPC-like.</p></details>
+      <details><summary>Distributed file systems</summary><p>HDFS divides files into blocks and replicates them across data nodes with a name service. The optional Hadoop cluster in this repository demonstrates HDFS/YARN for a MapReduce word-count job, not a general-purpose shared filesystem for booking data.</p></details>
+      <details><summary>Serverless architectures</summary><p>Functions run in provider-managed, event-triggered environments with scaling and billing by execution. No serverless deployment is included; the venue/coordinator services are long-running containers.</p></details>
+      <details><summary>Blockchain and distributed ledgers</summary><p>Replicated append-only records are agreed using consensus. Immutability and auditability trade off throughput, latency, privacy and governance. A ledger is unnecessary for this single-operator booking database, so no blockchain is implemented.</p></details>
+      <details><summary>Distributed database trade-offs</summary><p>Replication improves availability but adds consistency and conflict choices. Partitioning distributes load but complicates queries and transactions. SeatSync uses one MongoDB service and atomic per-seat updates; it does not demonstrate a multi-node database or CAP behavior under partition.</p></details>
+      <details><summary>Case studies</summary><p><b>Megaport:</b> cloud networking and service orchestration. <b>Cloudflare:</b> globally distributed edge services. <b>AWS:</b> cloud primitives and managed services. <b>Apache Hadoop:</b> distributed storage and batch processing. <b>Kubernetes:</b> container orchestration, scheduling and self-healing. These names are study references; SeatSync deploys locally and does not integrate with these providers.</p></details>
+      <details><summary>Self-study: Lodha–Kshemkalyani and Knapp</summary><p>Lodha–Kshemkalyani describes a fair distributed mutual-exclusion algorithm; review its ordering and fairness proof separately from the educational queue above. Knapp's classification organizes distributed deadlock-detection approaches (for example, centralized, hierarchical and distributed detection) and their communication/phantom-deadlock trade-offs. This app provides a wait-for-graph exercise, not those full algorithms.</p></details>
+    </div>
+  </section>
+  <footer>For coursework: explain which components are real services, which algorithm is implemented, and which topics are simulations or design notes. Run the booking demo using the instructions in the project README.</footer>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let queue = [];
+  let messageNumber = 0;
+  let streams = [];
+  const procs = [{l:0,v:[0,0]},{l:0,v:[0,0]}];
+  let inFlight = [];
+  let eventNumber = 0;
+  const log = [];
+  function rpcDemo() {
+    const id = ++messageNumber;
+    $("rpcOut").textContent = `Request #${id}: reserveSeat("A:C4") → server checks inventory → Response: confirmed (request id ${id}).`;
+  }
+  function enqueue() {
+    queue.push(`booking-event-${++messageNumber}`);
+    $("queueOut").textContent = `Queue (${queue.length}): ${queue.join(" → ")}`;
+  }
+  function dequeue() {
+    const msg = queue.shift();
+    $("queueOut").textContent = msg ? `Consumer received ${msg}.\nQueue (${queue.length}): ${queue.join(" → ") || "empty"}` : "No message available; the consumer can retry later.";
+  }
+  function streamDemo() {
+    streams = [];
+    $("streamOut").textContent = "Stream opened…";
+    ["seat-map chunk", "booking-status chunk", "stream complete"].forEach((chunk, i) => setTimeout(() => {
+      streams.push(`${i+1}. ${chunk}`);
+      $("streamOut").textContent = streams.join("\n");
+    }, 400 * (i + 1)));
+  }
+  function renderClocks() {
+    $("clockRows").innerHTML = procs.map((p,i) => `<tr><td>P${i+1}</td><td>${p.l}</td><td>[${p.v.join(", ")}]</td></tr>`).join("");
+  }
+  function localEvent(i) {
+    procs[i].l++;
+    procs[i].v[i]++;
+    log.push(`P${i+1} local event e${++eventNumber}: L=${procs[i].l}, V=[${procs[i].v}]`);
+    $("clockOut").textContent = log.slice(-8).join("\n");
+    renderClocks();
+  }
+  function sendClockMessage(from,to) {
+    localEvent(from);
+    inFlight.push({from,to,l:procs[from].l,v:[...procs[from].v],id:++messageNumber});
+    log.push(`P${from+1} sent message m${messageNumber} to P${to+1}`);
+    $("clockOut").textContent = log.slice(-8).join("\n");
+  }
+  function deliverClockMessage() {
+    if (!inFlight.length) { log.push("No message is in transit."); }
+    else {
+      const m = inFlight.shift();
+      const p = procs[m.to];
+      p.l = Math.max(p.l,m.l)+1;
+      p.v = p.v.map((n,i) => Math.max(n,m.v[i]));
+      p.v[m.to]++;
+      log.push(`P${m.to+1} received m${m.id}: L=${p.l}, V=[${p.v}]`);
+    }
+    $("clockOut").textContent = log.slice(-8).join("\n");
+    renderClocks();
+  }
+  function takeSnapshot() {
+    $("snapshotOut").textContent = `Process states: P1 [${procs[0].v}], P2 [${procs[1].v}]\nMessages in transit: ${inFlight.length ? inFlight.map(m=>`m${m.id} P${m.from+1}→P${m.to+1}`).join(", ") : "none"}\nThis educational snapshot records a cut; a real Chandy–Lamport implementation needs marker messages and channel recording.`;
+  }
+  function syncClocks() {
+    const offsets = [0,Number($("offset1").value),Number($("offset2").value),Number($("offset3").value)];
+    if (offsets.some(n => !Number.isFinite(n))) { $("syncOut").textContent = "Enter valid numeric offsets."; return; }
+    const avg = offsets.reduce((a,b)=>a+b,0)/offsets.length;
+    $("syncOut").textContent = offsets.map((n,i)=>`Node ${i}: offset ${n>=0?"+":""}${n.toFixed(2)}s → adjustment ${(avg-n>=0?"+":"")}${(avg-n).toFixed(2)}s`).join("\n")+`\nTarget average offset: ${avg.toFixed(2)}s`;
+  }
+  const alive = new Set([1,2,3,4]);
+  function drawNodes() { $("nodeStatus").innerHTML = [...Array(4)].map((_,i)=>`<span class="seat-node">Node ${i+1}: <b class="${alive.has(i+1)?"good":"warn"}">${alive.has(i+1)?"alive":"down"}</b></span>`).join(""); }
+  function toggleNode(id) { alive.has(id) ? alive.delete(id) : alive.add(id); drawNodes(); }
+  function runElection(kind) {
+    const start = Number($("electionStart").value);
+    if (!alive.size) { $("electionOut").textContent = "No live nodes can become leader."; return; }
+    if (!alive.has(start)) { $("electionOut").textContent = `Node ${start} is down; choose a live initiator.`; return; }
+    const winner = Math.max(...alive);
+    const trace = kind === "bully"
+      ? [`Node ${start} starts election; asks higher-ID live nodes.`, ...[...alive].filter(n=>n>start).map(n=>`Node ${n} replies OK and starts its own election.`), `Highest live ID ${winner} receives no higher reply and announces leadership.`]
+      : [`Election token starts at node ${start}.`, `Token visits live nodes in ring order: ${[...alive].filter(n=>n>=start).concat([...alive].filter(n=>n<start)).join(" → ")} → ${start}.`, `Highest ID ${winner} wins and announces leadership.`];
+    $("electionOut").textContent = trace.join("\n");
+  }
+  let requests = [];
+  let csOwner = null;
+  let reqClock = 0;
+  function drawMutex(note="") {
+    const algo = $("mutexAlgo").value;
+    const queueText = requests.length ? requests.map(r=>`P${r.id}(t=${r.t})`).join(" → ") : "empty";
+    $("mutexOut").textContent = `${note}${csOwner ? `P${csOwner} currently holds the critical section.` : "Critical section is free."}\nWaiting requests: ${queueText}\nAlgorithm: ${algo==="ra"?"Ricart–Agrawala: requests broadcast; peers reply unless requesting earlier":algo==="lamport"?"Lamport: timestamp-ordered request/reply/release queue":"Centralized: one coordinator grants one request at a time"}`;
+  }
+  function requestCS(id) {
+    if (csOwner===id || requests.some(r=>r.id===id)) { drawMutex(`P${id} already owns or requested it.\n`); return; }
+    requests.push({id,t:++reqClock});
+    requests.sort((a,b)=>a.t-b.t||a.id-b.id);
+    if (csOwner===null) csOwner=requests.shift().id;
+    drawMutex();
+  }
+  function releaseCS() {
+    if (csOwner===null) { drawMutex("No process currently owns it.\n"); return; }
+    const old=csOwner; csOwner=requests.length?requests.shift().id:null;
+    drawMutex(`P${old} released; next request granted if queued.\n`);
+  }
+  function detectDeadlock() {
+    const mode=$("deadlockMode").value;
+    const graph=mode==="cycle"?{A:["B"],B:["C"],C:["A"]}:mode==="edge"?{A:["B"],B:["A"]}:{A:["B"],B:["C"],C:[]};
+    const visiting=new Set(),done=new Set();
+    function visit(n) { if(visiting.has(n)) return true; if(done.has(n)) return false; visiting.add(n); for(const m of graph[n]||[]) if(visit(m)) return true; visiting.delete(n); done.add(n); return false; }
+    const cycle=Object.keys(graph).some(visit);
+    $("deadlockOut").textContent=`Wait-for graph: ${Object.entries(graph).map(([a,bs])=>`${a}→${bs.join(",")||"∅"}`).join("; ")}\n${cycle?"Cycle detected: deadlock in this single-instance resource model.":"No cycle detected in this graph."}`;
+  }
+  let misses=0;
+  function beacon(heard) { misses=heard?0:misses+1; $("beaconOut").textContent=`${misses>=3?"Suspected failed (timeout threshold reached).":"Node considered healthy."} ${misses} consecutive missed beacons.`; }
+  function resetBeacon() { misses=0; beacon(true); }
+  let pc1,pc2,channel;
+  const waitIce = pc => pc.iceGatheringState==="complete" ? Promise.resolve() : new Promise(resolve=>pc.addEventListener("icegatheringstatechange",()=>{if(pc.iceGatheringState==="complete") resolve();},{once:false}));
+  async function connectRTC() {
+    $("rtcConnect").disabled=true;
+    $("rtcOut").textContent="Creating local peer connection…";
+    try {
+      pc1=new RTCPeerConnection({iceServers:[]}); pc2=new RTCPeerConnection({iceServers:[]});
+      channel=pc1.createDataChannel("seatsync-demo");
+      pc2.ondatachannel=e=>{e.channel.onmessage=msg=>$("rtcOut").textContent+=`\nPeer received: ${msg.data}`;};
+      channel.onopen=()=>{$("rtcSend").disabled=false; $("rtcOut").textContent="Local P2P data channel is open.";};
+      pc1.onconnectionstatechange=()=>{if(pc1.connectionState==="failed") $("rtcOut").textContent="WebRTC connection failed in this browser.";};
+      const offer=await pc1.createOffer(); await pc1.setLocalDescription(offer); await waitIce(pc1);
+      await pc2.setRemoteDescription(pc1.localDescription);
+      const answer=await pc2.createAnswer(); await pc2.setLocalDescription(answer); await waitIce(pc2);
+      await pc1.setRemoteDescription(pc2.localDescription);
+      await new Promise((resolve,reject)=>{if(channel.readyState==="open") resolve(); else {channel.addEventListener("open",resolve,{once:true}); setTimeout(()=>reject(new Error("Timed out opening local data channel")),8000);}});
+    } catch(err) {
+      $("rtcOut").textContent=`WebRTC setup failed: ${err.message}. Try a current browser with WebRTC support.`;
+      $("rtcConnect").disabled=false;
+    }
+  }
+  function sendRTC() {
+    if(!channel || channel.readyState!=="open") { $("rtcOut").textContent="Connect the peers first."; return; }
+    channel.send($("rtcMessage").value);
+    $("rtcOut").textContent=`Sent over data channel: ${$("rtcMessage").value}`;
+  }
+  renderClocks(); drawNodes(); drawMutex();
+</script>
+</body>
+</html>
